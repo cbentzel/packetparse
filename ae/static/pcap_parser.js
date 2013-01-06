@@ -3,9 +3,8 @@
 // The file format is described at 
 // http://wiki.wireshark.org/Development/LibpcapFileFormat
 
-function PcapParser() {
-    this.error = undefined;
-    this.data = [];
+var PcapParser = (function() {
+    'use strict';
 
     var State = {
         INIT: 0,
@@ -15,19 +14,28 @@ function PcapParser() {
         ERROR_DONE: 4,
     };
 
-    this.state = State.INIT;
+    var FILE_HEADER_SIZE = 24;
 
-    this.addData = function (data) {
+    function PcapParser(onFileHeader, onPacket, onError) {
+        this._error = undefined;
+        this._data = [];
+        this._state = State.INIT;
+        this.onFileHeader = onFileHeader;
+        this.onPacket = onPacket;
+        this.onError = onError;
     };
 
-    // Users can override onError, onFileHeader
-    // and onEntry
-    this.onError = function (error) {
-    }
-
-    this.onFileHeader = function (headerDetails) {
-    }
-
-    this.onPacket = function (packetHeader, packetBody) {
-    }
-};
+    PcapParser.prototype = {
+        addData: function (data) {
+            switch (this._state) {
+            case State.INIT:
+                // Accumulate data.
+                // If we have >= 
+                console.log('In INIT state');
+                break;
+            };
+        }
+    };
+    
+    return PcapParser;
+})();
