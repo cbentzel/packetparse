@@ -17,9 +17,9 @@ var PcapParser = (function() {
     var FILE_HEADER_SIZE = 24;
 
     function PcapParser(onFileHeader, onPacket, onError) {
-        this._error = undefined;
-        this._data = [];
-        this._state = State.INIT;
+        this.error_ = undefined;
+        this.data_ = [];
+        this.state_ = State.INIT;
         this.onFileHeader = onFileHeader;
         this.onPacket = onPacket;
         this.onError = onError;
@@ -27,7 +27,7 @@ var PcapParser = (function() {
 
     PcapParser.prototype = {
         addData: function (data) {
-            switch (this._state) {
+            switch (this.state_) {
             case State.INIT:
                 // Accumulate data.
                 // If we have >= 
