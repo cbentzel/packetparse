@@ -19,6 +19,7 @@ var PcapParser = (function() {
     function PcapParser(onFileHeader, onPacket, onError) {
         this.error_ = undefined;
         this.data_ = [];
+        this.totalByteCount_ = 0;
         this.state_ = State.INIT;
         this.onFileHeader = onFileHeader;
         this.onPacket = onPacket;
@@ -27,14 +28,27 @@ var PcapParser = (function() {
 
     PcapParser.prototype = {
         addData: function (data) {
+            if (!(data instanceof ArrayBuffer)) {
+                throw {name: 'BadDataArg'};
+            }
+
+            // We always accumulate data, regardless of the
+            // state.
+            this.data_.push(data)
+            this.totalByteCount_ += data.byteLength;
+
+            // Make sure that data is an ArrayBuffer.
             switch (this.state_) {
             case State.INIT:
-                // Accumulate data.
-                // If we have >= 
                 console.log('In INIT state');
+                if (this.totalByteCount_ >= FILE_HEADER_SIZE) {
+                    console.log('Enough data');
+                    // Parse the header. We need to copy out x bytes of data.
+                    // Perhaps have a helper for that?
+                }
                 break;
             };
-        }
+        },
     };
     
     return PcapParser;
