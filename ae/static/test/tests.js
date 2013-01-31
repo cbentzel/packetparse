@@ -11,6 +11,14 @@ test("Bad addData calls", function() {
   throws(function() {pcapParser.addData(function() {})});
 });
 
+// Tests global header parser.
+test("Global header parser", function() {
+  var pcapParser = new PcapParser();
+  throws(function() {pcapParser.parseGlobalHeader_(2);});
+  throws(function() {pcapParser.parseGlobalHeader_(new ArrayBuffer(23));});
+  equal(undefined, pcapParser.parseGlobalHeader_(new ArrayBuffer(24)));
+});
+
 // Tests what happens when this goes to a new state.
 test("Pre-init addData calls", function() {
   var pcapParser = new PcapParser();

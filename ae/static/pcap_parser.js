@@ -27,6 +27,39 @@ var PcapParser = (function() {
   };
 
   PcapParser.prototype = {
+    // Returns an object representing the header, or undefined
+    // if invalid.
+    parseGlobalHeader_: function (buffer) {
+      if (!buffer instanceof ArrayBuffer || buffer.byteLength < 24) {
+        throw {name: 'BadBufferArg'};
+      }
+      
+      var magicNumberView = new Uint32Array(buffer, 0, 1);
+      var versionView = new Uint16Array(buffer, 4, 2);
+      var timezoneView = new Int32Array(buffer, 8, 1);
+      var extraView = new Uint32Array(buffer, 12, 3);
+      
+      var magicNumber = magicNumberView[0];
+      if (magicNumber != 0xa1b2c3d4)
+        return;
+      
+      var majorVersion = versionView[0];
+      if (majorVersion != 2)
+        return;
+      
+      var minorVersion = versionView[1];
+      if (minorVersion != 4)
+        return;
+      
+      // Probably check network
+      return {
+        zone: timezoneView[0],
+        sigfigs: extraView[0],
+        snaplen: extraView[1],
+        network: extraView[2],
+      };
+    },
+
     addData: function (data) {
       if (!(data instanceof ArrayBuffer)) {
         throw {name: 'BadDataArg'};
