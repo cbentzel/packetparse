@@ -4,6 +4,28 @@
 <script src='pcap_parser.js'></script>
 </head>
 <body>
-Hello there
+<input type="file" id="filePicker" name="filePicker"/>
+
+<script>
+  function handleFileSelect(evt) {
+    var files = evt.target.files;
+    var file = files[0];
+    // Read the file
+    var reader = new FileReader();
+    reader.onload = function (progressEvent) {
+      // TODO(cbentzel): We'd want to do this incrementally.
+      pcapParser = new PcapParser();
+      pcapParser.addData(progressEvent.target.result);
+      console.log('The file is read');
+    };
+    reader.onprogress = function (progressEvent) {
+      console.log('Progress in reading file');
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  document.getElementById('filePicker').addEventListener(
+      'change', handleFileSelect, false);
+</script>
 </body>
 </html>
