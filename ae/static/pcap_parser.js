@@ -34,29 +34,39 @@ var PcapParser = (function() {
         throw {name: 'BadBufferArg'};
       }
       
-      var magicNumberView = new Uint32Array(buffer, 0, 1);
-      var versionView = new Uint16Array(buffer, 4, 2);
-      var timezoneView = new Int32Array(buffer, 8, 1);
-      var extraView = new Uint32Array(buffer, 12, 3);
-      
-      var magicNumber = magicNumberView[0];
-      if (magicNumber != 0xa1b2c3d4)
+      var dv = new DataView(buffer);
+
+      // Determine if this is a little-endian or big-endian file
+      // using the magic number.
+      var magicNumber = dv.getUint32(0);
+      if (magicNumber == 0xa1b2c3d4) {
+        var littleEndian = false;
+      } else if (magicNumber == 0xd4c3b2a1) {
+        var littleEndian = true;
+      } else {
+        // Invalid magic number.
         return;
-      
-      var majorVersion = versionView[0];
+      }
+
+      var majorVersion = dv.getUint16(4, littleEndian);
       if (majorVersion != 2)
         return;
-      
-      var minorVersion = versionView[1];
-      if (minorVersion != 4)
+      var minorVersion = dv.getUint16(6, littleEndian);
+      if (minorVersion != 2)
         return;
       
+      var timeZone = dv.getInt32(8, littleEndian);
+      var sigfigs = dv.getUint32(12, littleEndian);
+      var snapLen = dv.getUint32(16, littleEndian);
+      var networkNum = dv.getUint32(20, littleEndian);
+
       // Probably check network
       return {
-        zone: timezoneView[0],
-        sigfigs: extraView[0],
-        snaplen: extraView[1],
-        network: extraView[2],
+        littleEndian: littleEndian,
+        timeZone: timeZone,
+        sigfigs: sigfigs,
+        snapLen: snapLen,
+        networkNum: networkNum,
       };
     },
 
