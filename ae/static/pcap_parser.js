@@ -27,6 +27,22 @@ var PcapParser = (function() {
   };
 
   PcapParser.prototype = {
+    getData_: function (byte_count) {
+      if (byte_count > this.totalByteCount_) {
+        throw {name: 'NotEnoughRoom'};
+      }
+      if (byte_count < this.data_[0].byteLength) {
+        var retSlice = this.data_[0].slice(0, byte_count);
+        this.data_[0] = this.data_[0].slice(byte_count);
+        return retSlice;
+      } else {
+        // Not quite sure how we can create a new ArrayBuffer which
+        // includes contents of other buffers - other than maybe using
+        // Uint8Views and copying? Sounds horrible.
+        throw {name: 'NotImplemented'};
+      }
+    },
+
     // Returns an object representing the header, or undefined
     // if invalid.
     parseGlobalHeader_: function (buffer) {
@@ -86,6 +102,7 @@ var PcapParser = (function() {
         console.log('In INIT state');
         if (this.totalByteCount_ >= FILE_HEADER_SIZE) {
           console.log('Enough data');
+          this.parseGlobalHeader_(this.getData_(FILE_HEADER_SIZE));
           // Parse the header. We need to copy out x bytes of data.
           // Perhaps have a helper for that?
         }
