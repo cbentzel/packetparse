@@ -17,6 +17,50 @@ var PcapParser = (function() {
   var GLOBAL_HEADER_SIZE = 24;
   var PACKET_HEADER_SIZE = 16;
 
+  // Returns an object representing the header, or undefined
+  // if invalid.
+  function parseGlobalHeader(buffer) {
+    if (!buffer instanceof ArrayBuffer || buffer.byteLength < 24) {
+      throw {name: 'BadBufferArg'};
+    }
+    
+    var dv = new DataView(buffer);
+
+    // Determine if this is a little-endian or big-endian file
+    // using the magic number.
+    var magicNumber = dv.getUint32(0);
+    if (magicNumber == 0xa1b2c3d4) {
+      var littleEndian = false;
+    } else if (magicNumber == 0xd4c3b2a1) {
+      var littleEndian = true;
+    } else {
+      // Invalid magic number.
+      return;
+    }
+
+    var majorVersion = dv.getUint16(4, littleEndian);
+    if (majorVersion != 2)
+      return;
+    var minorVersion = dv.getUint16(6, littleEndian);
+    if (minorVersion != 4)
+      return;
+    
+    var timeZone = dv.getInt32(8, littleEndian);
+    var sigfigs = dv.getUint32(12, littleEndian);
+    var snapLen = dv.getUint32(16, littleEndian);
+
+    // TODO(cbentzel): Convert network to a symbolic string?
+    var networkNum = dv.getUint32(20, littleEndian);
+
+    return {
+      littleEndian: littleEndian,
+      timeZone: timeZone,
+      sigfigs: sigfigs,
+      snapLen: snapLen,
+      networkNum: networkNum,
+    };
+  };
+
   function PcapParser(onGlobalHeader, onPacket, onError) {
     this.error_ = undefined;
     this.data_ = [];
@@ -47,50 +91,6 @@ var PcapParser = (function() {
       }
     },
 
-    // Returns an object representing the header, or undefined
-    // if invalid.
-    parseGlobalHeader_: function (buffer) {
-      if (!buffer instanceof ArrayBuffer || buffer.byteLength < 24) {
-        throw {name: 'BadBufferArg'};
-      }
-      
-      var dv = new DataView(buffer);
-
-      // Determine if this is a little-endian or big-endian file
-      // using the magic number.
-      var magicNumber = dv.getUint32(0);
-      if (magicNumber == 0xa1b2c3d4) {
-        var littleEndian = false;
-      } else if (magicNumber == 0xd4c3b2a1) {
-        var littleEndian = true;
-      } else {
-        // Invalid magic number.
-        return;
-      }
-
-      var majorVersion = dv.getUint16(4, littleEndian);
-      if (majorVersion != 2)
-        return;
-      var minorVersion = dv.getUint16(6, littleEndian);
-      if (minorVersion != 4)
-        return;
-      
-      var timeZone = dv.getInt32(8, littleEndian);
-      var sigfigs = dv.getUint32(12, littleEndian);
-      var snapLen = dv.getUint32(16, littleEndian);
-
-      // TODO(cbentzel): Convert network to a symbolic string?
-      var networkNum = dv.getUint32(20, littleEndian);
-
-      return {
-        littleEndian: littleEndian,
-        timeZone: timeZone,
-        sigfigs: sigfigs,
-        snapLen: snapLen,
-        networkNum: networkNum,
-      };
-    },
-
     addData: function (data) {
       if (!(data instanceof ArrayBuffer)) {
         throw {name: 'BadDataArg'};
@@ -108,7 +108,7 @@ var PcapParser = (function() {
         case State.INIT:
           var globalHeaderData = this.getData_(GLOBAL_HEADER_SIZE);
           if (globalHeaderData) {
-            var globalHeader = this.parseGlobalHeader_(globalHeaderData);
+            var globalHeader = parseGlobalHeader(globalHeaderData);
             if (!globalHeader) {
               this.state_ = State.ERROR_DONE;
               if (this.onError) {
