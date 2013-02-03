@@ -149,22 +149,32 @@ var PcapParser = (function() {
             }
           }
           break;
+
         case State.PACKET_HEADER:
-          var packetHeaderData = this.getData_(PACKET_HEADER_SIZE);
-          if (packetHeaderData) {
-            var packetHeader = parsePacketHeader(packetHeaderData, 
-                                                 this.littleEndian_);
-            if (!packetHeader) {
-              this.state_ = State.ERROR_DONE;
-              if (this.onError) {
-                this.onError(this);
+          // We may actually reach EOF here, need to handle that.
+          if (this.atEof_()) {
+            this.state_ = State.FILE_DONE;
+            if (this.onDone) {
+              this.onDone(this);
+            }
+          } else {
+            var packetHeaderData = this.getData_(PACKET_HEADER_SIZE);
+            if (packetHeaderData) {
+              var packetHeader = parsePacketHeader(packetHeaderData, 
+                                                   this.littleEndian_);
+              if (!packetHeader) {
+                this.state_ = State.ERROR_DONE;
+                if (this.onError) {
+                  this.onError(this);
+                }
+              } else {
+                this.packetHeader_ = packetHeader;
+                this.state_ = State.PACKET_BODY;
               }
-            } else {
-              this.packetHeader_ = packetHeader;
-              this.state_ = State.PACKET_BODY;
             }
           }
           break;
+
         case State.PACKET_BODY:
           var packetData = this.getData_(this.packetHeader_.savedLen);
           if (packetData) {
@@ -173,15 +183,7 @@ var PcapParser = (function() {
             if (this.onPacket) {
               this.onPacket(packetHeader, packetData); 
             }
-            // We may actually reach EOF here, need to handle that.
-            if (this.atEof_()) {
-              this.state_ = State.FILE_DONE;
-              if (this.onDone) {
-                this.onDone(this);
-              }
-            } else {
-              this.state_ = State.PACKET_HEADER;
-            }
+            this.state_ = State.PACKET_HEADER;
           }
           break;
         };
