@@ -20,7 +20,8 @@ var PcapParser = (function() {
   // Returns an object representing the header, or undefined
   // if invalid.
   function parseGlobalHeader(buffer) {
-    if (!buffer instanceof ArrayBuffer || buffer.byteLength < 24) {
+    if (!buffer instanceof ArrayBuffer || 
+        buffer.byteLength < GLOBAL_HEADER_SIZE) {
       throw {name: 'BadBufferArg'};
     }
     
@@ -61,13 +62,35 @@ var PcapParser = (function() {
     };
   };
 
+  function parsePacketHeader(buffer, littleEndian) {
+    if (!buffer instanceof ArrayBuffer || 
+        buffer.byteLength < PACKET_HEADER_SIZE) {
+      throw {name: 'BadBufferArg'};
+    }
+    
+    var dv = new DataView(buffer);
+    
+    var secs = dv.getUint32(0, littleEndian);
+    var usecs = dv.getUint32(4, littleEndian);
+    var savedLen = dv.getUint32(8, littleEndian);
+    var actualLen = dv.getUint32(12, littleEndian);
+    
+    return {
+      secs: secs,
+      usecs: usecs,
+      savedLen: savedLen,
+      actualLen: actualLen,
+    };
+  };
+
   function PcapParser(onGlobalHeader, onPacket, onError) {
     this.error_ = undefined;
     this.data_ = [];
-    this.globalHeader_ = undefined;
     this.totalByteCount_ = 0;
     this.unreadByteCunt_ = 0;
     this.state_ = State.INIT;
+    this.packetHeader_ = undefined;
+    this.littleEndian_ = true;
     this.onGlobalHeader = onGlobalHeader;
     this.onPacket = onPacket;
     this.onError = onError;
@@ -115,8 +138,8 @@ var PcapParser = (function() {
                 this.onError(this);
               }
             } else {
+              this.littleEndian_ = globalHeader.littleEndian;
               this.state_ = State.PACKET_HEADER;
-              this.globalHeader_ = globalHeader;
               if (this.onGlobalHeader) {
                 this.onGlobalHeader(this, globalHeader);
               }
@@ -126,17 +149,31 @@ var PcapParser = (function() {
         case State.PACKET_HEADER:
           var packetHeaderData = this.getData_(PACKET_HEADER_SIZE);
           if (packetHeaderData) {
-            var packetHeader = this.parsePacketHeader_(packetHeaderData);
+            var packetHeader = parsePacketHeader(packetHeaderData, 
+                                                 this.littleEndian_);
             if (!packetHeader) {
               this.state_ = State.ERROR_DONE;
               if (this.onError) {
                 this.onError(this);
               }
             } else {
-              this.state_ = State.PACKET_DATA;
-              // I probably need to preserve the size;
+              this.packetHeader_ = packetHeader;
+              this.state_ = State.PACKET_BODY;
             }
           }
+          break;
+        case State.PACKET_BODY:
+          var packetData = this.getData_(this.packetHeader_.savedLen);
+          if (packetData) {
+            // We may actually reach EOF here, need to handle that.
+            this.state_ = State.PACKET_HEADER;
+            var packetHeader = this.packetHeader_;
+            this.packetHeader_ = undefined;
+            if (this.onPacket) {
+              this.onPacket(packetHeader, packetData); 
+            }
+          }
+          break;
         };
         console.log('From ' + oldState + ' to ' + this.state_);
         if (oldState == this.state_)
