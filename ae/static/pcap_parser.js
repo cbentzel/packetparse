@@ -11,7 +11,8 @@ var PcapParser = (function() {
     FILE_HEADER: 1,
     PACKET_HEADER: 2,
     PACKET_BODY: 3,
-    ERROR_DONE: 4,
+    FILE_DONE: 4,
+    ERROR_DONE: 5,
   };
 
   var GLOBAL_HEADER_SIZE = 24;
@@ -83,9 +84,10 @@ var PcapParser = (function() {
     };
   };
 
-  function PcapParser(onGlobalHeader, onPacket, onError) {
+  function PcapParser(onGlobalHeader, onPacket, onDone, onError) {
     this.error_ = undefined;
     this.data_ = [];
+    this.eof_ = false;
     this.totalByteCount_ = 0;
     this.unreadByteCount_ = 0;
     this.state_ = State.INIT;
@@ -93,15 +95,26 @@ var PcapParser = (function() {
     this.littleEndian_ = true;
     this.onGlobalHeader = onGlobalHeader;
     this.onPacket = onPacket;
+    this.onDone = onDone;
     this.onError = onError;
   };
 
   PcapParser.prototype = {
+    atEof_: function () {
+      return (this.eof_ && this.unreadByteCount_ == 0);
+    },
+
     getData_: function (byte_count) {
       if (byte_count > this.unreadByteCount_) {
-        return undefined;
+        if (this.eof_) {
+          // File terminated abruptly.
+          throw {name: 'UnexpectedEof'};
+        } else {
+          // Not enough data accumulated.
+          return undefined;
+        }
       }
-      if (byte_count < this.data_[0].byteLength) {
+      if (byte_count <= this.data_[0].byteLength) {
         this.unreadByteCount_ -= byte_count;
         var retSlice = this.data_[0].slice(0, byte_count);
         this.data_[0] = this.data_[0].slice(byte_count);
@@ -155,12 +168,19 @@ var PcapParser = (function() {
         case State.PACKET_BODY:
           var packetData = this.getData_(this.packetHeader_.savedLen);
           if (packetData) {
-            // We may actually reach EOF here, need to handle that.
-            this.state_ = State.PACKET_HEADER;
             var packetHeader = this.packetHeader_;
             this.packetHeader_ = undefined;
             if (this.onPacket) {
               this.onPacket(packetHeader, packetData); 
+            }
+            // We may actually reach EOF here, need to handle that.
+            if (this.atEof_()) {
+              this.state_ = State.FILE_DONE;
+              if (this.onDone) {
+                this.onDone(this);
+              }
+            } else {
+              this.state_ = State.PACKET_HEADER;
             }
           }
           break;
@@ -171,15 +191,28 @@ var PcapParser = (function() {
       }
     },
 
+    // Add new data to be parsed, and runs state machine.
     addData: function (data) {
       if (!(data instanceof ArrayBuffer)) {
         throw {name: 'BadDataArg'};
+      }
+      if (this.eof_) {
+        throw {name: 'BadState'};
       }
 
       this.data_.push(data)
       this.totalByteCount_ += data.byteLength;
       this.unreadByteCount_ += data.byteLength;
 
+      this.runStateMachine_();
+    },
+
+    // Indicates that no more data exists (EOF, or XHR close, etc).
+    finishData: function () {
+      if (this.eof_) {
+        throw {name: 'BadState'};
+      }
+      this.eof_ = true;
       this.runStateMachine_();
     },
   };

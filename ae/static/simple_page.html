@@ -12,14 +12,16 @@
     var file = files[0];
     // Read the file
     var reader = new FileReader();
+    var pcapParser = new PcapParser();
     reader.onload = function (progressEvent) {
-      // TODO(cbentzel): We'd want to do this incrementally.
-      pcapParser = new PcapParser();
       pcapParser.addData(progressEvent.target.result);
       console.log('The file is read');
     };
     reader.onprogress = function (progressEvent) {
       console.log('Progress in reading file');
+    };
+    reader.onloadend = function (progressEvent) {
+      pcapParser.finishData();
     };
     reader.readAsArrayBuffer(file);
   }
