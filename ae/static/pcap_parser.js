@@ -68,7 +68,7 @@ var PcapParser = (function() {
       if (majorVersion != 2)
         return;
       var minorVersion = dv.getUint16(6, littleEndian);
-      if (minorVersion != 2)
+      if (minorVersion != 4)
         return;
       
       var timeZone = dv.getInt32(8, littleEndian);
@@ -102,9 +102,8 @@ var PcapParser = (function() {
         console.log('In INIT state');
         if (this.totalByteCount_ >= FILE_HEADER_SIZE) {
           console.log('Enough data');
-          this.parseGlobalHeader_(this.getData_(FILE_HEADER_SIZE));
-          // Parse the header. We need to copy out x bytes of data.
-          // Perhaps have a helper for that?
+          var globalHeader = this.parseGlobalHeader_(
+            this.getData_(FILE_HEADER_SIZE));
         }
         break;
       };
