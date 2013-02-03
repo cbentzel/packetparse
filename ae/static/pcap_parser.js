@@ -114,17 +114,7 @@ var PcapParser = (function() {
       }
     },
 
-    addData: function (data) {
-      if (!(data instanceof ArrayBuffer)) {
-        throw {name: 'BadDataArg'};
-      }
-
-      // We always accumulate data, regardless of the
-      // state.
-      this.data_.push(data)
-      this.totalByteCount_ += data.byteLength;
-      this.unreadByteCount_ += data.byteLength;
-
+    runStateMachine_: function () {
       while (true) {
         var oldState = this.state_;
         switch (this.state_) {
@@ -179,6 +169,18 @@ var PcapParser = (function() {
         if (oldState == this.state_)
           break;
       }
+    },
+
+    addData: function (data) {
+      if (!(data instanceof ArrayBuffer)) {
+        throw {name: 'BadDataArg'};
+      }
+
+      this.data_.push(data)
+      this.totalByteCount_ += data.byteLength;
+      this.unreadByteCount_ += data.byteLength;
+
+      this.runStateMachine_();
     },
   };
   
