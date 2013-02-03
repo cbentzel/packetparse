@@ -14,24 +14,28 @@ var PcapParser = (function() {
     ERROR_DONE: 4,
   };
 
-  var FILE_HEADER_SIZE = 24;
+  var GLOBAL_HEADER_SIZE = 24;
+  var PACKET_HEADER_SIZE = 16;
 
-  function PcapParser(onFileHeader, onPacket, onError) {
+  function PcapParser(onGlobalHeader, onPacket, onError) {
     this.error_ = undefined;
     this.data_ = [];
+    this.globalHeader_ = undefined;
     this.totalByteCount_ = 0;
+    this.unreadByteCunt_ = 0;
     this.state_ = State.INIT;
-    this.onFileHeader = onFileHeader;
+    this.onGlobalHeader = onGlobalHeader;
     this.onPacket = onPacket;
     this.onError = onError;
   };
 
   PcapParser.prototype = {
     getData_: function (byte_count) {
-      if (byte_count > this.totalByteCount_) {
-        throw {name: 'NotEnoughRoom'};
+      if (byte_count > this.unreadByteCount_) {
+        return undefined;
       }
       if (byte_count < this.data_[0].byteLength) {
+        this.unreadByteCount_ -= byte_count;
         var retSlice = this.data_[0].slice(0, byte_count);
         this.data_[0] = this.data_[0].slice(byte_count);
         return retSlice;
@@ -74,9 +78,10 @@ var PcapParser = (function() {
       var timeZone = dv.getInt32(8, littleEndian);
       var sigfigs = dv.getUint32(12, littleEndian);
       var snapLen = dv.getUint32(16, littleEndian);
+
+      // TODO(cbentzel): Convert network to a symbolic string?
       var networkNum = dv.getUint32(20, littleEndian);
 
-      // Probably check network
       return {
         littleEndian: littleEndian,
         timeZone: timeZone,
@@ -95,18 +100,48 @@ var PcapParser = (function() {
       // state.
       this.data_.push(data)
       this.totalByteCount_ += data.byteLength;
+      this.unreadByteCount_ += data.byteLength;
 
-      // Make sure that data is an ArrayBuffer.
-      switch (this.state_) {
-      case State.INIT:
-        console.log('In INIT state');
-        if (this.totalByteCount_ >= FILE_HEADER_SIZE) {
-          console.log('Enough data');
-          var globalHeader = this.parseGlobalHeader_(
-            this.getData_(FILE_HEADER_SIZE));
-        }
-        break;
-      };
+      while (true) {
+        var oldState = this.state_;
+        switch (this.state_) {
+        case State.INIT:
+          var globalHeaderData = this.getData_(GLOBAL_HEADER_SIZE);
+          if (globalHeaderData) {
+            var globalHeader = this.parseGlobalHeader_(globalHeaderData);
+            if (!globalHeader) {
+              this.state_ = State.ERROR_DONE;
+              if (this.onError) {
+                this.onError(this);
+              }
+            } else {
+              this.state_ = State.PACKET_HEADER;
+              this.globalHeader_ = globalHeader;
+              if (this.onGlobalHeader) {
+                this.onGlobalHeader(this, globalHeader);
+              }
+            }
+          }
+          break;
+        case State.PACKET_HEADER:
+          var packetHeaderData = this.getData_(PACKET_HEADER_SIZE);
+          if (packetHeaderData) {
+            var packetHeader = this.parsePacketHeader_(packetHeaderData);
+            if (!packetHeader) {
+              this.state_ = State.ERROR_DONE;
+              if (this.onError) {
+                this.onError(this);
+              }
+            } else {
+              this.state_ = State.PACKET_DATA;
+              // I probably need to preserve the size;
+            }
+          }
+        };
+        console.log('From ' + oldState + ' to ' + this.state_);
+        if (oldState == this.state_)
+          break;
+      }
     },
   };
   
