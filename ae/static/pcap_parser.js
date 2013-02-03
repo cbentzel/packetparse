@@ -7,12 +7,11 @@ var PcapParser = (function() {
   'use strict';
 
   var State = {
-    INIT: 0,
-    FILE_HEADER: 1,
-    PACKET_HEADER: 2,
-    PACKET_BODY: 3,
-    FILE_DONE: 4,
-    ERROR_DONE: 5,
+    FILE_HEADER: 0,
+    PACKET_HEADER: 1,
+    PACKET_BODY: 2,
+    FILE_DONE: 3,
+    ERROR_DONE: 4,
   };
 
   var GLOBAL_HEADER_SIZE = 24;
@@ -90,7 +89,7 @@ var PcapParser = (function() {
     this.eof_ = false;
     this.totalByteCount_ = 0;
     this.unreadByteCount_ = 0;
-    this.state_ = State.INIT;
+    this.state_ = State.FILE_HEADER;
     this.packetHeader_ = undefined;
     this.littleEndian_ = true;
     this.onGlobalHeader = onGlobalHeader;
@@ -131,7 +130,7 @@ var PcapParser = (function() {
       while (true) {
         var oldState = this.state_;
         switch (this.state_) {
-        case State.INIT:
+        case State.FILE_HEADER:
           var globalHeaderData = this.getData_(GLOBAL_HEADER_SIZE);
           if (globalHeaderData) {
             var globalHeader = parseGlobalHeader(globalHeaderData);
